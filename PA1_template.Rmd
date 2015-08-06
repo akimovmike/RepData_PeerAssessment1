@@ -7,19 +7,86 @@ output:
 
 
 ## Loading and preprocessing the data
-
-
-
+```{r echo = TRUE}
+data1 <- read.csv(file = "activity.csv", header = T, sep = ",")
+```
 ## What is mean total number of steps taken per day?
+```{r echo = TRUE, fig.path = 'figure/'}
+stepsDay <- by(data1$steps, data1$date, mean, na.rm = T)
+hist(stepsDay, main = "Steps per day", xlab = "Mean steps per day")
+stepMean <- mean(stepsDay, na.rm = T)
+stepMedian <- median(stepsDay, na.rm = T)
+```
+Mean total number of steps is `r round(stepMean,1)`.
 
-
+Median total number of steps is `r round(stepMedian,1)`.
 
 ## What is the average daily activity pattern?
-
-
+```{r echo = TRUE, fig.path = 'figure/'}
+avgSteps <- by(data1$steps, data1$interval, mean, na.rm = T)
+plot(unique(data1$interval), avgSteps, type = "l",
+     ylab = "Average steps per interval", 
+     xlab = "5-minute interval",
+     main = "Time series plot")
+maxStep <- data1$interval[which.max(avgSteps)]
+```
+The interval `r maxStep` contains the maximum average number of steps.
 
 ## Imputing missing values
+```{r echo = TRUE}
+totalNa <- sum(is.na(data1$steps) | is.na(data1$date) | is.na(data1$interval))
+stepNa <- sum(is.na(data1$steps))
+dateNa <- sum(is.na(data1$date))
+intervalNa <- sum(is.na(data1$interval))
+```
+The total number of missing values is `r totalNa`; there are `r stepNa`, `r dateNa`
+and `r intervalNa` missing values in steps, date and interval columns, accordingly.
 
+I will be using the median step number for the time interval to fill in the missing 
+values.
 
+```{r echo = T, fig.path = 'figure/'}
+data2 <- data1
+naVec <- is.na(data2$steps)
+
+medSteps <- by(data2$steps, data2$interval, median, na.rm = T)
+names(medSteps) <- unique(data2$interval)
+
+data2$steps[naVec] <- medSteps[as.character(data2$interval[naVec])]
+
+stepsDay2 <- by(data2$steps, data2$date, mean)
+
+hist(stepsDay2, main = "Steps per day after imputation", xlab = "Mean steps per day")
+stepMean2 <- mean(stepsDay2)
+stepMedian2 <- median(stepsDay2)
+```
+Mean total number of steps after imputation is `r round(stepMean2,1)`.
+
+Median total number of steps after imputation is `r round(stepMedian2,1)`.
+
+These values differ from the estimate without imputation, mean is lower by 
+`r stepMean - stepMean2` steps, and median is lower by `r stepMedian - stepMedian2` steps.
 
 ## Are there differences in activity patterns between weekdays and weekends?
+```{r echo = TRUE, fig.path = 'figure/'}
+Sys.setlocale("LC_TIME", "en_US") # for compatibility
+data2$dayType <- factor(ifelse(
+    weekdays(
+        as.Date(data2$date, "%Y-%m-%d"), abbreviate = T
+    ) %in% c("Sat", "Sun"), "weekend", "weekday"
+))
+
+library(ggplot2)
+library(data.table)
+data2 <- as.data.table(data2)
+
+ggplot(data2[,list(steps = mean(steps)), by=list(interval, dayType)]) +
+    aes(interval, steps)+
+    geom_line()+
+    facet_grid(dayType ~ .)+
+    xlab("Interval")+
+    ylab("Mean steps per day")
+
+```
+
+So, the activity patterns are different.
